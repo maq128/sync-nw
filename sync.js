@@ -499,6 +499,22 @@ FilesMan.prototype.progress = function(html) {
 	showProgressBar(html);
 };
 
+FilesMan.prototype.mkdirp = function(fullpath, finish) {
+	var me = this;
+	// 先尝试创建指定目录
+	fs.mkdir(fullpath, function(err) {
+		if (err && err.code == 'ENOENT') {
+			// 若失败原因是“父目录不存在”，则递归创建父目录
+			me.mkdirp(path.dirname(fullpath), function(err) {
+				// 然后再次尝试创建指定目录
+				fs.mkdir(fullpath, finish);
+			});
+			return;
+		}
+		finish(err);
+	});
+};
+
 FilesMan.prototype.copy = function() {
 	var me = this;
 
@@ -548,7 +564,7 @@ FilesMan.prototype.copy = function() {
 			var rs = fs.createReadStream(from);
 			rs.on('open', function() {
 				// 确保目标目录存在，不存在则创建
-				fs.mkdir(path.dirname(to), function(err) {
+				me.mkdirp(path.dirname(to), function(err) {
 					if (err && err.code != 'EEXIST') {
 						rs.destroy();
 						relayOnce(err);
@@ -557,11 +573,13 @@ FilesMan.prototype.copy = function() {
 					var ws = fs.createWriteStream(to);
 					ws.on('open', function() {
 						rs.pipe(ws).on('finish', function() {
-							// 设置目标文件的时间戳
-							fs.utimes(to, stats.atime, stats.mtime, function(err) {
-								me.sofar ++;
-								relayOnce(err);
-							});
+							// 设置目标文件的时间戳（延迟一点时间是为了避免最终的 mtime 变成当前时间）
+							setTimeout(function() {
+								fs.utimes(to, stats.atime, stats.mtime, function(err) {
+									me.sofar ++;
+									relayOnce(err);
+								});
+							}, 1);
 						}).on('error', function() {
 							rs.destroy();
 							ws.destroy();
