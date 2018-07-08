@@ -577,9 +577,9 @@ FilesMan.prototype.copy = function() {
 							setTimeout(function() {
 								fs.utimes(to, stats.atime, stats.mtime, function(err) {
 									me.sofar ++;
-									relayOnce(err);
 								});
-							}, 1);
+							}, 100);
+							relayOnce(null);
 						}).on('error', function() {
 							rs.destroy();
 							ws.destroy();
